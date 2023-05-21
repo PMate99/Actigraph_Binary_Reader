@@ -1,9 +1,6 @@
 import numpy as np
-from datetime import datetime, timedelta
 import struct
-import pytz
 import pandas as pd
-from dateutil.relativedelta import relativedelta
 
 
 def actigraph_read_binary_copy(path_to_binary_file, timezone):
@@ -16,32 +13,26 @@ def actigraph_read_binary_copy(path_to_binary_file, timezone):
     number_of_datasets_on_one_page = length_of_measurement_data_on_one_page // length_of_one_dataset
 
     # open binary file in read mode and read into array then close it
-    with open("file.actigraph", mode='rb') as file:
-
+    with open(path_to_binary_file, mode='rb') as file:
         binary_data = np.fromfile(file, dtype=np.uint8)
 
     counter = 0
     for _ in binary_data:
         counter += 1
-
-    print(" binary_data hossza: " + str(counter))
-    # print(binary_data[-3000:-2000])
+    print("Binary_data length: " + str(counter) + "\n")
 
     # get calibration coefficients
     calibration_coefficients = np.array([struct.unpack(">d", binary_data[i:i + 8])[0] for i in range(0, 48, 8)])
-    print(" calibration_coefficients: " + str(np.round(calibration_coefficients, 4)))
 
     # delete calibration coefficients from binary data
     binary_data = binary_data[48:]
 
     # get metadata array out of file array
     metadata_array = binary_data[:length_of_metadata]
-    print(metadata_array)
 
     # get number of pages from metadata (1st 2 bytes of metadata), decrement is
     # needed to exclude last page (last page may not be fully written)
     number_of_memory_pages = struct.unpack(">H", metadata_array[:2])[0] - 1
-    print(number_of_memory_pages)
 
     # get sampling rate from metadata (3rd byte of metadata)
     sampling_rate_lookup = {
@@ -72,33 +63,25 @@ def actigraph_read_binary_copy(path_to_binary_file, timezone):
     # delete metadata from binary data, after this operation the file array
     # will contain only the pages
     binary_data = binary_data[length_of_metadata:]
-    print(binary_data)
+
     # preallocate arrays to speed up process
-
     binary_timestamps = np.zeros((number_of_memory_pages * length_of_one_timestamp,), dtype=np.uint8)
-    print(binary_timestamps)
-
-    # counter2=0
-    # for _ in binary_timestamps:
-    #     counter2 +=1
-    # print(counter2)
-
-    binary_measurement_data_x = np.zeros((number_of_memory_pages * length_of_measurement_data_on_one_page // 3,),dtype=np.uint8)
-    binary_measurement_data_y = np.zeros((number_of_memory_pages * length_of_measurement_data_on_one_page // 3,),dtype=np.uint8)
-    binary_measurement_data_z = np.zeros((number_of_memory_pages * length_of_measurement_data_on_one_page // 3,),dtype=np.uint8)
+    binary_measurement_data_x = np.zeros((number_of_memory_pages * length_of_measurement_data_on_one_page // 3,),
+                                         dtype=np.uint8)
+    binary_measurement_data_y = np.zeros((number_of_memory_pages * length_of_measurement_data_on_one_page // 3,),
+                                         dtype=np.uint8)
+    binary_measurement_data_z = np.zeros((number_of_memory_pages * length_of_measurement_data_on_one_page // 3,),
+                                         dtype=np.uint8)
 
     # auxiliary variables to iterate through pages
     xyz_index = 0
     timestamp_index = 0
     memory_page_byte_index = 0
-    counter2 = 0
-    print(number_of_datasets_on_one_page)
+
     # iterate through pages, while iterating collect x, y, z measurement data
     # and timestamps into specific binary arrays
     for i in range(number_of_memory_pages):
         memory_page_start_byte = memory_page_byte_index
-
-        counter2 += 1
 
         # collect x, y, z measurement data of actual page
         measurement_data_byte_index = memory_page_start_byte
@@ -117,7 +100,6 @@ def actigraph_read_binary_copy(path_to_binary_file, timezone):
             measurement_data_byte_index += 6
 
         # collect timestamp of actual page
-
         binary_timestamps[timestamp_index] = binary_data[
             memory_page_start_byte + length_of_measurement_data_on_one_page]
         binary_timestamps[timestamp_index + 1] = binary_data[
@@ -135,9 +117,6 @@ def actigraph_read_binary_copy(path_to_binary_file, timezone):
         memory_page_byte_index += length_of_page
 
     # get measurement data out of binary measurement data array
-    print(binary_timestamps[0:6])
-    print(binary_timestamps[-6:])
-
     scaling_constant_for_measurement_data = 2 / (2 ** 16) * measurement_interval
     measurement_data_x = (np.frombuffer(binary_measurement_data_x, dtype=np.int16).astype(
         np.float64) * scaling_constant_for_measurement_data)[:, np.newaxis]
@@ -147,9 +126,7 @@ def actigraph_read_binary_copy(path_to_binary_file, timezone):
         np.float64) * scaling_constant_for_measurement_data)[:, np.newaxis]
     measurement_data = np.hstack((measurement_data_x, measurement_data_y, measurement_data_z))
 
-    print(np.round(measurement_data, 4))
     # get timestamps out of binary timestamp array
-
     timestamps = [None] * number_of_memory_pages
     timestamp_index = 0
     for i in range(number_of_memory_pages):
@@ -167,13 +144,19 @@ def actigraph_read_binary_copy(path_to_binary_file, timezone):
     timestamps = pd.to_datetime(timestamps, utc=True)
     timestamps = timestamps.tz_convert('Europe/Budapest')
 
-
     timestamps = timestamps.strftime("%Y-%m-%d %H:%M:%S.%f")
     timestamps = timestamps.str.slice(0, -3)
 
+    print("ID: " + str(id) + "\n")
+    print("Measurement_interval: " + str(measurement_interval) + "\n")
+    print("Sampling_rate:" + str(sampling_rate) + "\n")
+    print("Is_high_precision: " + str(is_high_precision) + "\n")
+    print("Calibration_coefficients: " + str(np.round(calibration_coefficients, 4)) + "\n")
+    print("Measurement_data: \n" + str(measurement_data) + "\n")
+    print("Timestamps: \n" + str(timestamps) + "\n")
+
     print('Binary file reading finished.')
 
-    print(timestamps)
     return id, measurement_interval, sampling_rate, is_high_precision, measurement_data, calibration_coefficients, timestamps
 
 
