@@ -1,9 +1,6 @@
 import numpy as np
-from datetime import datetime, timedelta
 import struct
-import pytz
 import pandas as pd
-from dateutil.relativedelta import relativedelta
 
 
 def actigraph_read_binary_copy(path_to_binary_file, timezone):
@@ -83,9 +80,12 @@ def actigraph_read_binary_copy(path_to_binary_file, timezone):
     #     counter2 +=1
     # print(counter2)
 
-    binary_measurement_data_x = np.zeros((number_of_memory_pages * length_of_measurement_data_on_one_page // 3,),dtype=np.uint8)
-    binary_measurement_data_y = np.zeros((number_of_memory_pages * length_of_measurement_data_on_one_page // 3,),dtype=np.uint8)
-    binary_measurement_data_z = np.zeros((number_of_memory_pages * length_of_measurement_data_on_one_page // 3,),dtype=np.uint8)
+    binary_measurement_data_x = np.zeros((number_of_memory_pages * length_of_measurement_data_on_one_page // 3,),
+                                         dtype=np.uint8)
+    binary_measurement_data_y = np.zeros((number_of_memory_pages * length_of_measurement_data_on_one_page // 3,),
+                                         dtype=np.uint8)
+    binary_measurement_data_z = np.zeros((number_of_memory_pages * length_of_measurement_data_on_one_page // 3,),
+                                         dtype=np.uint8)
 
     # auxiliary variables to iterate through pages
     xyz_index = 0
@@ -148,6 +148,8 @@ def actigraph_read_binary_copy(path_to_binary_file, timezone):
     measurement_data = np.hstack((measurement_data_x, measurement_data_y, measurement_data_z))
 
     print(np.round(measurement_data, 4))
+    # for row in np.round(measurement_data, 4):
+    #     print(row)
     # get timestamps out of binary timestamp array
 
     timestamps = [None] * number_of_memory_pages
@@ -167,13 +169,13 @@ def actigraph_read_binary_copy(path_to_binary_file, timezone):
     timestamps = pd.to_datetime(timestamps, utc=True)
     timestamps = timestamps.tz_convert('Europe/Budapest')
 
-
     timestamps = timestamps.strftime("%Y-%m-%d %H:%M:%S.%f")
     timestamps = timestamps.str.slice(0, -3)
 
     print('Binary file reading finished.')
 
-    print(timestamps)
+    for timestamp in timestamps:
+        print(timestamp)
     return id, measurement_interval, sampling_rate, is_high_precision, measurement_data, calibration_coefficients, timestamps
 
 
